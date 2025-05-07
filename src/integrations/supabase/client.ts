@@ -2,10 +2,35 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = "https://vjpwxhvakqdxuiicpkjj.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZqcHd4aHZha3FkeHVpaWNwa2pqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDUxNTI1NzMsImV4cCI6MjA2MDcyODU3M30.9dv2nhBfhaN7iYFQXGBhdzMLHSYeKaiX1MpdfSzXXbo";
+const SUPABASE_URL = "https://ceddhsecoanqfnjmqahh.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNlZGRoc2Vjb2FucWZuam1xYWhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDUzOTk4NDMsImV4cCI6MjA2MDk3NTg0M30.x9kXathL4VAJ4nEzyuuN9qIoftfPkNnULO2DPd5uh9c";
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+
+// Helper function to get the current user's ID
+export const getCurrentUserId = async () => {
+  const { data: { user } } = await supabase.auth.getUser();
+  return user?.id;
+};
+
+// Real-time subscription setup
+export const setupNotificationsSubscription = async () => {
+  const userId = await getCurrentUserId();
+  if (!userId) return;
+
+  return supabase
+    .channel('notifications')
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'notifications',
+      filter: `user_id=eq.${userId}`,
+    }, (payload) => {
+      // Handle notification
+      console.log('New notification:', payload);
+    })
+    .subscribe();
+};

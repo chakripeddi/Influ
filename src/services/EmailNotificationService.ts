@@ -1,6 +1,6 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { EmailNotification } from '@/types/notification';
+import { renderTemplate } from '@/utils/template-renderer';
 
 class EmailNotificationService {
   /**
@@ -9,26 +9,61 @@ class EmailNotificationService {
    */
   async sendEmailNotification(notification: EmailNotification): Promise<boolean> {
     try {
-      // This is a placeholder - in a real implementation this would call a Supabase Edge Function
-      console.log('Sending email notification:', notification);
+      // Get the email template
+      const template = await this.getEmailTemplate(notification.type);
       
-      // Update the status of the email notification
-      // Use 'any' type to bypass TypeScript's strict type checking for tables not in the schema
-      const { error } = await supabase
-        .from('email_notifications' as any)
-        .update({ delivery_status: 'sent' })
-        .eq('id', notification.id)
-        .returns<any>();
+      // Render the template with notification data
+      const renderedContent = await renderTemplate(template, {
+        notification,
+        user: notification.user,
+        campaign: notification.campaign,
+        action: notification.action
+      });
       
-      if (error) {
-        throw error;
-      }
+      // Call Supabase Edge Function to send email
+      const { data, error } = await supabase.functions.invoke('send-email', {
+        body: {
+          to: notification.user.email,
+          subject: notification.title,
+          html: renderedContent,
+          notificationId: notification.id
+        }
+      });
+      
+      if (error) throw error;
+      
+      // Update email notification status
+      const { error: updateError } = await supabase
+        .from('email_notifications')
+        .update({ 
+          delivery_status: 'sent',
+          sent_at: new Date().toISOString()
+        })
+        .eq('id', notification.id);
+      
+      if (updateError) throw updateError;
       
       return true;
     } catch (error) {
       console.error('Error sending email notification:', error);
       return false;
     }
+  }
+
+  private async getEmailTemplate(type: string): Promise<string> {
+    // In a real implementation, this would fetch from a database or file system
+    const templates = {
+      'campaign_status': `
+        <h1>Campaign Status Update</h1>
+        <p>Hi {{ user.firstName }},</p>
+        <p>{{ notification.message }}</p>
+        <p>Your campaign "{{ campaign.name }}" has been {{ campaign.status }}.</p>
+        <a href="{{ action.url }}">{{ action.text }}</a>
+      `,
+      // Add other templates as needed
+    };
+    
+    return templates[type] || templates['default'];
   }
 
   /**

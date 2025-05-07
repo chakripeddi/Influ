@@ -148,15 +148,24 @@ const Login = () => {
     setError(null);
     
     try {
-      // Placeholder for social login - not fully implemented yet
-      toast({
-        title: `${provider.charAt(0).toUpperCase() + provider.slice(1)} login`,
-        description: "Social login is not configured yet.",
-        variant: "destructive",
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: provider,
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`
+        }
       });
+      
+      if (error) throw error;
+      
+      // The redirect will be handled by the auth callback
     } catch (err) {
       console.error(`${provider} login error:`, err);
       setError('Social login failed. Please try again or use email/password.');
+      toast({
+        title: "Login failed",
+        description: "Could not authenticate with social provider.",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }

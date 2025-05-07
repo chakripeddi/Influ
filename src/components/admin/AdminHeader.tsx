@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
 
 const AdminHeader: React.FC = () => {
   const { user, signOut } = useAuth();
@@ -37,6 +38,15 @@ const AdminHeader: React.FC = () => {
       navigate('/login');
     } catch (error) {
       console.error('Error signing out:', error);
+    }
+  };
+
+  const testConnection = async () => {
+    const { data, error } = await supabase.from('campaigns').select('*').limit(1);
+    if (error) {
+      console.error('Connection error:', error);
+    } else {
+      console.log('Connected successfully:', data);
     }
   };
 

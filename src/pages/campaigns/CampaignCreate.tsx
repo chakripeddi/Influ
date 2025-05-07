@@ -221,8 +221,18 @@ const CampaignCreate = () => {
   
   const handlePreview = () => {
     const values = form.getValues();
-    // Could save to localStorage or state management before showing preview
-    toast.info("Preview feature", { description: "Campaign preview is coming soon" });
+    const previewData = {
+      ...values,
+      status: 'preview',
+      created_at: new Date().toISOString(),
+      id: 'preview-' + Date.now()
+    };
+    
+    // Store preview data in localStorage
+    localStorage.setItem('campaignPreview', JSON.stringify(previewData));
+    
+    // Open preview in new tab
+    window.open(`/campaigns/preview/${previewData.id}`, '_blank');
   };
   
   const handleAiSuggestions = () => {
