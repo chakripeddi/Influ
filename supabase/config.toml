@@ -1,0 +1,16 @@
+project_id = "vjpwxhvakqdxuiicpkjj"
+
+[functions.create-payment-session]
+verify_jwt = true
+
+[functions.submit-kyc]
+verify_jwt = true
+
+[functions.convert-points]
+verify_jwt = true
+
+[functions.webhook-stripe]
+verify_jwt = false
+
+[functions.create-test-users]
+verify_jwt = false
