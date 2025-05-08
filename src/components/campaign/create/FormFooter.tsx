@@ -1,10 +1,10 @@
-
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { EyeIcon, Loader2, CircleCheck } from 'lucide-react';
 
 interface FormFooterProps {
   isSubmitting: boolean;
+  isSavingDraft: boolean;
   saveDraft: () => void;
   handleSubmit: () => void;
   showPreview: () => void;
@@ -12,6 +12,7 @@ interface FormFooterProps {
 
 const FormFooter: React.FC<FormFooterProps> = ({
   isSubmitting,
+  isSavingDraft,
   saveDraft,
   handleSubmit,
   showPreview
@@ -21,8 +22,16 @@ const FormFooter: React.FC<FormFooterProps> = ({
       <Button
         variant="outline"
         onClick={saveDraft}
+        disabled={isSavingDraft}
       >
-        Save as Draft
+        {isSavingDraft ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Saving...
+          </>
+        ) : (
+          'Save as Draft'
+        )}
       </Button>
       
       <div className="flex gap-2">

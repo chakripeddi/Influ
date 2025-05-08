@@ -1,6 +1,5 @@
-
 import React, { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { AuthStatus } from '@/components/auth/AuthStatus';
 import MainLayout from '@/components/layout/MainLayout';
@@ -8,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { useToast } from "@/components/ui/use-toast";
 import {
   Card,
   CardContent,
@@ -31,11 +31,18 @@ import {
   Shield,
   Target,
   Users,
+  Bookmark,
+  Share2,
+  Flag,
 } from 'lucide-react';
 
 const CampaignDetailPage = () => {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { toast } = useToast();
   const [applySectionVisible, setApplySectionVisible] = useState(false);
+  const [isBookmarked, setIsBookmarked] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Mock campaign data
   const campaign = {
@@ -87,6 +94,114 @@ const CampaignDetailPage = () => {
     }, 100);
   };
 
+  // Handle bookmark campaign
+  const handleBookmark = () => {
+    setIsBookmarked(!isBookmarked);
+    toast({
+      title: isBookmarked ? "Campaign Unbookmarked" : "Campaign Bookmarked",
+      description: isBookmarked 
+        ? "Campaign removed from your bookmarks" 
+        : "Campaign added to your bookmarks",
+    });
+  };
+
+  // Handle share campaign
+  const handleShare = async () => {
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: campaign.title,
+          text: `Check out this campaign: ${campaign.title} by ${campaign.brandName}`,
+          url: window.location.href,
+        });
+      } else {
+        // Fallback for browsers that don't support Web Share API
+        await navigator.clipboard.writeText(window.location.href);
+        toast({
+          title: "Link Copied",
+          description: "Campaign link has been copied to your clipboard",
+        });
+      }
+    } catch (error) {
+      console.error('Error sharing:', error);
+      toast({
+        title: "Share Failed",
+        description: "There was an error sharing the campaign. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Handle report campaign
+  const handleReport = () => {
+    toast({
+      title: "Report Campaign",
+      description: "Please select a reason for reporting this campaign",
+      action: (
+        <div className="flex flex-col gap-2">
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => toast({
+              title: "Report Submitted",
+              description: "Thank you for your report. Our team will review it shortly.",
+            })}
+          >
+            Misleading Content
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => toast({
+              title: "Report Submitted",
+              description: "Thank you for your report. Our team will review it shortly.",
+            })}
+          >
+            Inappropriate Content
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => toast({
+              title: "Report Submitted",
+              description: "Thank you for your report. Our team will review it shortly.",
+            })}
+          >
+            Other
+          </Button>
+        </div>
+      ),
+    });
+  };
+
+  // Handle application submission
+  const handleSubmitApplication = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      toast({
+        title: "Application Submitted",
+        description: "Your application has been submitted successfully. The brand will review it shortly.",
+      });
+      
+      // Navigate to dashboard or applications page
+      navigate('/dashboard');
+    } catch (error) {
+      console.error('Error submitting application:', error);
+      toast({
+        title: "Submission Failed",
+        description: "There was an error submitting your application. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <AuthStatus>
       <MainLayout>
@@ -100,9 +215,33 @@ const CampaignDetailPage = () => {
               <Button variant="outline">Back to Campaigns</Button>
             </Link>
             <div className="flex-1" />
-            <Button onClick={scrollToApply} ripple>
-              Apply Now <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
+            <div className="flex gap-2">
+              <Button 
+                variant="ghost" 
+                size="icon"
+                onClick={handleBookmark}
+                className={isBookmarked ? "text-primary" : ""}
+              >
+                <Bookmark className={`h-5 w-5 ${isBookmarked ? "fill-primary" : ""}`} />
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="icon"
+                onClick={handleShare}
+              >
+                <Share2 className="h-5 w-5" />
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="icon"
+                onClick={handleReport}
+              >
+                <Flag className="h-5 w-5" />
+              </Button>
+              <Button onClick={scrollToApply} ripple>
+                Apply Now <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </div>
           </div>
           
           <div className="flex flex-col lg:flex-row gap-8">
@@ -288,13 +427,14 @@ const CampaignDetailPage = () => {
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <form className="space-y-4">
+                    <form onSubmit={handleSubmitApplication} className="space-y-4">
                       <div className="space-y-2">
                         <label className="text-sm font-medium">Your Pitch</label>
                         <textarea 
                           className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" 
                           rows={4}
                           placeholder="Explain why you're a great fit for this campaign..."
+                          required
                         ></textarea>
                       </div>
                       
@@ -304,6 +444,7 @@ const CampaignDetailPage = () => {
                           className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" 
                           rows={3}
                           placeholder="Brief description of your content idea..."
+                          required
                         ></textarea>
                       </div>
                       
@@ -313,6 +454,7 @@ const CampaignDetailPage = () => {
                           type="text" 
                           className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                           placeholder="Enter your rate (e.g., $XXX)"
+                          required
                         />
                       </div>
                       
@@ -327,8 +469,23 @@ const CampaignDetailPage = () => {
                     </form>
                   </CardContent>
                   <CardFooter>
-                    <Button className="w-full" ripple animation="bounce">
-                      Submit Application <ArrowRight className="ml-2 h-4 w-4" />
+                    <Button 
+                      className="w-full" 
+                      onClick={handleSubmitApplication}
+                      disabled={isSubmitting}
+                      ripple 
+                      animation="bounce"
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <span className="animate-spin mr-2">⏳</span>
+                          Submitting...
+                        </>
+                      ) : (
+                        <>
+                          Submit Application <ArrowRight className="ml-2 h-4 w-4" />
+                        </>
+                      )}
                     </Button>
                   </CardFooter>
                 </Card>

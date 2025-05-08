@@ -1,6 +1,5 @@
-
 import React, { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { AuthStatus } from '@/components/auth/AuthStatus';
 import MainLayout from '@/components/layout/MainLayout';
@@ -25,6 +24,7 @@ import {
   Upload,
   X,
 } from 'lucide-react';
+import { useToast } from '@/components/ui/use-toast';
 
 type UploadState = 'idle' | 'uploading' | 'success' | 'error';
 type ContentSubmissionItem = {
@@ -39,8 +39,12 @@ type ContentSubmissionItem = {
 
 const DeliverableSubmissionPage = () => {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { toast } = useToast();
   const [submissionItems, setSubmissionItems] = useState<ContentSubmissionItem[]>([]);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
 
   // Mock campaign data
   const campaign = {
@@ -70,6 +74,11 @@ const DeliverableSubmissionPage = () => {
 
   const handleRemoveContent = (id: string) => {
     setSubmissionItems(submissionItems.filter(item => item.id !== id));
+    setUploadProgress(prev => {
+      const newProgress = { ...prev };
+      delete newProgress[id];
+      return newProgress;
+    });
   };
 
   const handleUrlChange = (id: string, url: string) => {
@@ -96,7 +105,7 @@ const DeliverableSubmissionPage = () => {
     );
   };
 
-  const simulateUpload = (id: string) => {
+  const simulateUpload = async (id: string) => {
     // Find the item
     const item = submissionItems.find(i => i.id === id);
     if (!item) return;
@@ -126,28 +135,95 @@ const DeliverableSubmissionPage = () => {
         }, 500);
       }
       
-      setSubmissionItems(
-        submissionItems.map(item => 
-          item.id === id ? { ...item, progress } : item
-        )
-      );
+      setUploadProgress(prev => ({
+        ...prev,
+        [id]: progress
+      }));
     }, 400);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
     
-    // Start uploading each item
-    submissionItems.forEach(item => {
-      if (item.status !== 'success') {
-        simulateUpload(item.id);
+    try {
+      // Validate required fields
+      const invalidItems = submissionItems.filter(item => {
+        if (item.type === 'link') {
+          return !item.url || !item.caption;
+        }
+        return !item.caption;
+      });
+
+      if (invalidItems.length > 0) {
+        toast({
+          title: "Missing Information",
+          description: "Please fill in all required fields for each content item.",
+          variant: "destructive",
+        });
+        return;
       }
-    });
-    
-    // Show success message after all uploads complete
-    setTimeout(() => {
+
+      // Start uploading each item
+      const uploadPromises = submissionItems.map(item => {
+        if (item.status !== 'success') {
+          return simulateUpload(item.id);
+        }
+        return Promise.resolve();
+      });
+      
+      await Promise.all(uploadPromises);
+      
+      // Show success message after all uploads complete
       setShowSuccess(true);
-    }, 3000);
+      
+      toast({
+        title: "Submission Complete",
+        description: "Your deliverables have been submitted successfully.",
+      });
+    } catch (error) {
+      console.error('Error submitting deliverables:', error);
+      toast({
+        title: "Submission Failed",
+        description: "There was an error submitting your deliverables. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleFileUpload = async (id: string, file: File) => {
+    try {
+      // Set status to uploading
+      setSubmissionItems(
+        submissionItems.map(item => 
+          item.id === id ? { ...item, status: 'uploading', progress: 0 } : item
+        )
+      );
+      
+      // Simulate file upload
+      await simulateUpload(id);
+      
+      toast({
+        title: "File Uploaded",
+        description: "Your file has been uploaded successfully.",
+      });
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      toast({
+        title: "Upload Failed",
+        description: "There was an error uploading your file. Please try again.",
+        variant: "destructive",
+      });
+      
+      // Reset item status
+      setSubmissionItems(
+        submissionItems.map(item => 
+          item.id === id ? { ...item, status: 'idle', progress: 0 } : item
+        )
+      );
+    }
   };
 
   return (
@@ -226,7 +302,7 @@ const DeliverableSubmissionPage = () => {
                       
                       {item.status === 'uploading' && (
                         <div className="absolute bottom-0 left-0 right-0">
-                          <Progress value={item.progress} className="h-1 rounded-none" />
+                          <Progress value={uploadProgress[item.id] || 0} className="h-1 rounded-none" />
                         </div>
                       )}
                       
@@ -254,6 +330,7 @@ const DeliverableSubmissionPage = () => {
                                 value={item.url}
                                 onChange={(e) => handleUrlChange(item.id, e.target.value)}
                                 className="rounded-l-none"
+                                required
                               />
                             </div>
                           ) : (
@@ -270,7 +347,24 @@ const DeliverableSubmissionPage = () => {
                                   <p className="text-xs text-muted-foreground mt-1">
                                     {item.type === 'image' ? 'JPG, PNG, WebP (max 10MB)' : 'MP4, MOV (max 100MB)'}
                                   </p>
-                                  <Button type="button" variant="outline" size="sm" className="mt-4">
+                                  <Button 
+                                    type="button" 
+                                    variant="outline" 
+                                    size="sm" 
+                                    className="mt-4"
+                                    onClick={() => {
+                                      const input = document.createElement('input');
+                                      input.type = 'file';
+                                      input.accept = item.type === 'image' ? 'image/*' : 'video/*';
+                                      input.onchange = (e) => {
+                                        const file = (e.target as HTMLInputElement).files?.[0];
+                                        if (file) {
+                                          handleFileUpload(item.id, file);
+                                        }
+                                      };
+                                      input.click();
+                                    }}
+                                  >
                                     <Upload className="h-4 w-4 mr-2" />
                                     Choose File
                                   </Button>
@@ -287,6 +381,7 @@ const DeliverableSubmissionPage = () => {
                             placeholder="Write a compelling caption..."
                             value={item.caption}
                             onChange={(e) => handleCaptionChange(item.id, e.target.value)}
+                            required
                           />
                         </div>
                         
@@ -354,8 +449,21 @@ const DeliverableSubmissionPage = () => {
                 </div>
                 
                 <div className="flex justify-end">
-                  <Button type="submit" disabled={submissionItems.length === 0} ripple>
-                    Submit Deliverables <ArrowLeft className="ml-2 h-4 w-4 rotate-180" />
+                  <Button 
+                    type="submit" 
+                    disabled={submissionItems.length === 0 || isSubmitting} 
+                    ripple
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <span className="animate-spin mr-2">⏳</span>
+                        Submitting...
+                      </>
+                    ) : (
+                      <>
+                        Submit Deliverables <ArrowLeft className="ml-2 h-4 w-4 rotate-180" />
+                      </>
+                    )}
                   </Button>
                 </div>
               </form>

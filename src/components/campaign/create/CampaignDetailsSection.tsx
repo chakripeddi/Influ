@@ -1,8 +1,9 @@
-
 import React from 'react';
 import { FormField, FormItem, FormLabel, FormControl, FormDescription, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
+import { Sparkles } from 'lucide-react';
 import FormSection from './FormSection';
 import RichTextEditor from './RichTextEditor';
 import MediaUploader from './MediaUploader';
@@ -15,11 +16,15 @@ type FormValues = z.infer<typeof campaignFormSchema>;
 interface CampaignDetailsSectionProps {
   control: Control<FormValues>;
   campaignTypes: string[];
+  onAiSuggestions: () => void;
+  isGeneratingAi: boolean;
 }
 
 const CampaignDetailsSection: React.FC<CampaignDetailsSectionProps> = ({ 
   control, 
-  campaignTypes 
+  campaignTypes,
+  onAiSuggestions,
+  isGeneratingAi
 }) => {
   return (
     <div id="campaign-details">
@@ -34,7 +39,20 @@ const CampaignDetailsSection: React.FC<CampaignDetailsSectionProps> = ({
               name="title"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Campaign Title</FormLabel>
+                  <div className="flex items-center justify-between">
+                    <FormLabel>Campaign Title</FormLabel>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={onAiSuggestions}
+                      disabled={isGeneratingAi}
+                      className="gap-2"
+                    >
+                      <Sparkles className="h-4 w-4" />
+                      {isGeneratingAi ? 'Generating...' : 'AI Suggestions'}
+                    </Button>
+                  </div>
                   <FormControl>
                     <Input 
                       placeholder="Summer Launch Promo" 

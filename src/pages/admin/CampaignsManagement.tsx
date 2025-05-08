@@ -1,6 +1,6 @@
-
 import React, { useState } from 'react';
-import { Search, Filter, Download, AlertCircle, CheckCircle2, XCircle, LineChart } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Search, Filter, Download, AlertCircle, CheckCircle2, XCircle, MoreVertical, Plus, Flag, CheckCircle, Ban, LineChart } from 'lucide-react';
 import { 
   Card, 
   CardContent, 
@@ -27,6 +27,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useToast } from "@/components/ui/use-toast";
 
 // Mock data for campaigns
 const mockCampaigns = [
@@ -98,29 +99,157 @@ const mockCampaigns = [
 ];
 
 const CampaignsManagement = () => {
+  const navigate = useNavigate();
+  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedFilter, setSelectedFilter] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [campaigns, setCampaigns] = useState(mockCampaigns);
   
-  const getStatusBadge = (status: string) => {
-    switch(status) {
-      case 'active':
-        return <Badge variant="outline" className="bg-green-50 text-green-800 border-green-200 flex items-center gap-1">
-          <CheckCircle2 className="h-3 w-3" /> Active
-        </Badge>;
-      case 'completed':
-        return <Badge variant="outline" className="bg-blue-50 text-blue-800 border-blue-200 flex items-center gap-1">
-          <CheckCircle2 className="h-3 w-3" /> Completed
-        </Badge>;
-      case 'flagged':
-        return <Badge variant="outline" className="bg-yellow-50 text-yellow-800 border-yellow-200 flex items-center gap-1">
-          <AlertCircle className="h-3 w-3" /> Flagged
-        </Badge>;
-      case 'rejected':
-        return <Badge variant="destructive" className="flex items-center gap-1">
-          <XCircle className="h-3 w-3" /> Rejected
-        </Badge>;
-      default:
-        return <Badge>{status}</Badge>;
+  const handleExport = async () => {
+    try {
+      setIsExporting(true);
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Create CSV content
+      const headers = ['ID', 'Title', 'Brand', 'Status', 'AI Score', 'Budget', 'Created At', 'Deadline'];
+      const csvContent = [
+        headers.join(','),
+        ...campaigns.map(campaign => [
+          campaign.id,
+          campaign.title,
+          campaign.brand,
+          campaign.status,
+          campaign.aiScore,
+          campaign.budget,
+          campaign.createdAt,
+          campaign.deadline
+        ].join(','))
+      ].join('\n');
+
+      // Create and download file
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `campaigns-export-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: "Export Successful",
+        description: "Your campaign data has been exported successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Export Failed",
+        description: "There was an error exporting the data. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
     }
+  };
+
+  const handleCreateCampaign = () => {
+    setIsCreating(true);
+    // Navigate to campaign creation page
+    navigate('/campaigns/create');
+  };
+
+  const handleApproveCampaign = async (campaign: typeof campaigns[0]) => {
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Update campaign status in state
+      setCampaigns(campaigns.map(c => 
+        c.id === campaign.id ? { ...c, status: 'active', aiScore: Math.min(100, c.aiScore + 10) } : c
+      ));
+      
+      toast({
+        title: "Campaign Approved",
+        description: `${campaign.title} has been approved and is now active.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Approval Failed",
+        description: "There was an error approving the campaign. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleFlagCampaign = async (campaign: typeof campaigns[0]) => {
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Update campaign status in state
+      setCampaigns(campaigns.map(c => 
+        c.id === campaign.id ? { ...c, status: 'flagged' } : c
+      ));
+      
+      toast({
+        title: "Campaign Flagged",
+        description: `${campaign.title} has been flagged for review.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Flagging Failed",
+        description: "There was an error flagging the campaign. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSuspendCampaign = async (campaign: typeof campaigns[0]) => {
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Update campaign status in state
+      setCampaigns(campaigns.map(c => 
+        c.id === campaign.id ? { ...c, status: 'suspended' } : c
+      ));
+      
+      toast({
+        title: "Campaign Suspended",
+        description: `${campaign.title} has been suspended.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Suspension Failed",
+        description: "There was an error suspending the campaign. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleViewCampaign = (campaignId: string) => {
+    navigate(`/campaigns/${campaignId}`);
+  };
+
+  const getStatusBadge = (status: string, aiScore: number) => {
+    if (status === 'suspended') {
+      return <Badge variant="destructive" className="flex items-center gap-1">
+        <XCircle className="h-3 w-3" /> Suspended
+      </Badge>;
+    } 
+    
+    if (status === 'flagged' || aiScore < 70) {
+      return <Badge variant="outline" className="bg-yellow-50 text-yellow-800 border-yellow-200 flex items-center gap-1">
+        <AlertCircle className="h-3 w-3" /> Flagged
+      </Badge>;
+    }
+    
+    return <Badge variant="outline" className="bg-green-50 text-green-800 border-green-200 flex items-center gap-1">
+      <CheckCircle2 className="h-3 w-3" /> Active
+    </Badge>;
   };
   
   const getCategoryBadge = (category: string) => {
@@ -138,19 +267,52 @@ const CampaignsManagement = () => {
     }
   };
   
-  const filteredCampaigns = mockCampaigns.filter(campaign =>
-    campaign.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    campaign.brand.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    campaign.id.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredCampaigns = campaigns.filter(campaign => {
+    const matchesSearch = 
+      campaign.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      campaign.brand.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      campaign.id.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    if (!selectedFilter) return matchesSearch;
+    
+    switch (selectedFilter) {
+      case 'active':
+        return matchesSearch && campaign.status === 'active';
+      case 'flagged':
+        return matchesSearch && (campaign.status === 'flagged' || campaign.aiScore < 70);
+      case 'suspended':
+        return matchesSearch && campaign.status === 'suspended';
+      case 'high-risk':
+        return matchesSearch && campaign.aiScore < 70;
+      default:
+        return matchesSearch;
+    }
+  });
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Campaigns Management</h1>
-        <Button variant="outline" size="sm" className="flex items-center gap-2">
-          <Download className="h-4 w-4" /> Export
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="flex items-center gap-2"
+            onClick={handleCreateCampaign}
+            disabled={isCreating}
+          >
+            <Plus className="h-4 w-4" /> {isCreating ? 'Creating...' : 'Create Campaign'}
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="flex items-center gap-2"
+            onClick={handleExport}
+            disabled={isExporting}
+          >
+            <Download className="h-4 w-4" /> {isExporting ? 'Exporting...' : 'Export'}
+          </Button>
+        </div>
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -164,7 +326,7 @@ const CampaignsManagement = () => {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{mockCampaigns.length}</div>
+            <div className="text-2xl font-bold">{campaigns.length}</div>
           </CardContent>
         </Card>
         
@@ -178,7 +340,7 @@ const CampaignsManagement = () => {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{mockCampaigns.filter(c => c.status === 'active').length}</div>
+            <div className="text-2xl font-bold">{campaigns.filter(c => c.status === 'active').length}</div>
           </CardContent>
         </Card>
         
@@ -192,23 +354,21 @@ const CampaignsManagement = () => {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{mockCampaigns.filter(c => c.status === 'flagged' || c.aiFlags.length > 0).length}</div>
+            <div className="text-2xl font-bold">{campaigns.filter(c => c.status === 'flagged' || c.aiFlags.length > 0).length}</div>
           </CardContent>
         </Card>
         
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">
-              Average AI Score
+              Suspended Campaigns
             </CardTitle>
             <div className="rounded-md p-1">
               <LineChart className="h-4 w-4" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {Math.round(mockCampaigns.reduce((acc, curr) => acc + curr.aiScore, 0) / mockCampaigns.length)}
-            </div>
+            <div className="text-2xl font-bold">{campaigns.filter(c => c.status === 'suspended').length}</div>
           </CardContent>
         </Card>
       </div>
@@ -217,7 +377,7 @@ const CampaignsManagement = () => {
         <CardHeader className="pb-3">
           <CardTitle>All Campaigns</CardTitle>
           <CardDescription>
-            Review and moderate all campaigns on the platform
+            Manage all campaigns and view AI analysis
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -244,16 +404,23 @@ const CampaignsManagement = () => {
                   <DropdownMenuContent align="end" className="w-[200px]">
                     <DropdownMenuLabel>Filter by</DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem>Status: Active</DropdownMenuItem>
-                    <DropdownMenuItem>Status: Completed</DropdownMenuItem>
-                    <DropdownMenuItem>Status: Flagged</DropdownMenuItem>
-                    <DropdownMenuItem>Status: Rejected</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setSelectedFilter('active')}>
+                      Status: Active
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setSelectedFilter('flagged')}>
+                      Status: Flagged
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setSelectedFilter('suspended')}>
+                      Status: Suspended
+                    </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem>Category: Fashion</DropdownMenuItem>
-                    <DropdownMenuItem>Category: Technology</DropdownMenuItem>
-                    <DropdownMenuItem>Category: Beauty</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setSelectedFilter('high-risk')}>
+                      AI Score: High Risk
+                    </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem>AI Score: High Risk</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setSelectedFilter(null)}>
+                      Clear Filters
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
@@ -264,11 +431,10 @@ const CampaignsManagement = () => {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Campaign</TableHead>
+                    <TableHead>Brand</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Category</TableHead>
                     <TableHead>AI Score</TableHead>
-                    <TableHead>Created</TableHead>
-                    <TableHead>Deadline</TableHead>
+                    <TableHead>Budget</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -278,11 +444,11 @@ const CampaignsManagement = () => {
                       <TableCell className="font-medium">
                         <div>
                           <div>{campaign.title}</div>
-                          <div className="text-xs text-muted-foreground">by {campaign.brand}</div>
+                          <div className="text-xs text-muted-foreground">{campaign.id}</div>
                         </div>
                       </TableCell>
-                      <TableCell>{getStatusBadge(campaign.status)}</TableCell>
-                      <TableCell>{getCategoryBadge(campaign.category)}</TableCell>
+                      <TableCell>{campaign.brand}</TableCell>
+                      <TableCell>{getStatusBadge(campaign.status, campaign.aiScore)}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <span 
@@ -300,12 +466,32 @@ const CampaignsManagement = () => {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell>{campaign.createdAt}</TableCell>
-                      <TableCell>{campaign.deadline}</TableCell>
+                      <TableCell>{campaign.budget}</TableCell>
                       <TableCell className="text-right">
-                        <Button variant="ghost" size="sm">
-                          Review
-                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleViewCampaign(campaign.id)}>
+                              View Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleApproveCampaign(campaign)}>
+                              <CheckCircle className="mr-2 h-4 w-4" />
+                              Approve Campaign
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleFlagCampaign(campaign)}>
+                              <Flag className="mr-2 h-4 w-4" />
+                              Flag for Review
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleSuspendCampaign(campaign)}>
+                              <Ban className="mr-2 h-4 w-4" />
+                              Suspend Campaign
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   ))}

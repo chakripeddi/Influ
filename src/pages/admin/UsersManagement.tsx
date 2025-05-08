@@ -1,6 +1,5 @@
-
 import React, { useState } from 'react';
-import { Search, Filter, Download, AlertCircle, CheckCircle2, XCircle } from 'lucide-react';
+import { Search, Filter, Download, AlertCircle, CheckCircle2, XCircle, MoreVertical, UserPlus, Ban, Shield, UserCheck } from 'lucide-react';
 import { 
   Card, 
   CardContent, 
@@ -28,6 +27,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import UserDetailsDialog from '@/components/admin/UserDetailsDialog';
+import { useToast } from "@/components/ui/use-toast";
 
 // Mock data
 const mockUsers = [
@@ -97,15 +97,57 @@ const mockUsers = [
 ];
 
 const UsersManagement = () => {
+  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedUser, setSelectedUser] = useState<typeof mockUsers[0] | null>(null);
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
+  const [selectedFilter, setSelectedFilter] = useState<string | null>(null);
   
   const handleOpenDetails = (user: typeof mockUsers[0]) => {
     setSelectedUser(user);
     setShowDetailsDialog(true);
   };
-  
+
+  const handleExport = () => {
+    // Implement export functionality
+    toast({
+      title: "Exporting data",
+      description: "Your user data is being exported...",
+    });
+  };
+
+  const handleAddUser = () => {
+    // Implement add user functionality
+    toast({
+      title: "Add User",
+      description: "Opening user creation form...",
+    });
+  };
+
+  const handleSuspendUser = (user: typeof mockUsers[0]) => {
+    // Implement suspend user functionality
+    toast({
+      title: "User Suspended",
+      description: `${user.name} has been suspended.`,
+    });
+  };
+
+  const handleVerifyUser = (user: typeof mockUsers[0]) => {
+    // Implement verify user functionality
+    toast({
+      title: "User Verified",
+      description: `${user.name} has been verified.`,
+    });
+  };
+
+  const handleAssignRole = (user: typeof mockUsers[0], role: string) => {
+    // Implement role assignment functionality
+    toast({
+      title: "Role Updated",
+      description: `${user.name}'s role has been updated to ${role}.`,
+    });
+  };
+
   const getRoleBadge = (role: string) => {
     switch (role) {
       case 'influencer':
@@ -137,19 +179,54 @@ const UsersManagement = () => {
     </Badge>;
   };
   
-  const filteredUsers = mockUsers.filter(user =>
-    user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    user.id.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredUsers = mockUsers.filter(user => {
+    const matchesSearch = 
+      user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      user.id.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    if (!selectedFilter) return matchesSearch;
+    
+    switch (selectedFilter) {
+      case 'influencer':
+      case 'brand':
+      case 'campaigner':
+        return matchesSearch && user.role === selectedFilter;
+      case 'active':
+        return matchesSearch && user.status === 'active';
+      case 'flagged':
+        return matchesSearch && (user.status === 'flagged' || user.aiScore < 70);
+      case 'suspended':
+        return matchesSearch && user.status === 'suspended';
+      case 'high-risk':
+        return matchesSearch && user.aiScore < 70;
+      default:
+        return matchesSearch;
+    }
+  });
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Users Management</h1>
-        <Button variant="outline" size="sm" className="flex items-center gap-2">
-          <Download className="h-4 w-4" /> Export
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="flex items-center gap-2"
+            onClick={handleAddUser}
+          >
+            <UserPlus className="h-4 w-4" /> Add User
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="flex items-center gap-2"
+            onClick={handleExport}
+          >
+            <Download className="h-4 w-4" /> Export
+          </Button>
+        </div>
       </div>
       
       <Card>
@@ -183,15 +260,33 @@ const UsersManagement = () => {
                   <DropdownMenuContent align="end" className="w-[200px]">
                     <DropdownMenuLabel>Filter by</DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem>Role: Influencer</DropdownMenuItem>
-                    <DropdownMenuItem>Role: Brand</DropdownMenuItem>
-                    <DropdownMenuItem>Role: Campaigner</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setSelectedFilter('influencer')}>
+                      Role: Influencer
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setSelectedFilter('brand')}>
+                      Role: Brand
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setSelectedFilter('campaigner')}>
+                      Role: Campaigner
+                    </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem>Status: Active</DropdownMenuItem>
-                    <DropdownMenuItem>Status: Flagged</DropdownMenuItem>
-                    <DropdownMenuItem>Status: Suspended</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setSelectedFilter('active')}>
+                      Status: Active
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setSelectedFilter('flagged')}>
+                      Status: Flagged
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setSelectedFilter('suspended')}>
+                      Status: Suspended
+                    </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem>AI Score: High Risk</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setSelectedFilter('high-risk')}>
+                      AI Score: High Risk
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => setSelectedFilter(null)}>
+                      Clear Filters
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
@@ -239,13 +334,41 @@ const UsersManagement = () => {
                       </TableCell>
                       <TableCell>{user.registeredAt}</TableCell>
                       <TableCell className="text-right">
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={() => handleOpenDetails(user)}
-                        >
-                          Details
-                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleOpenDetails(user)}>
+                              View Details
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => handleVerifyUser(user)}>
+                              <UserCheck className="mr-2 h-4 w-4" />
+                              Verify User
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleSuspendUser(user)}>
+                              <Ban className="mr-2 h-4 w-4" />
+                              Suspend User
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuLabel>Assign Role</DropdownMenuLabel>
+                            <DropdownMenuItem onClick={() => handleAssignRole(user, 'admin')}>
+                              <Shield className="mr-2 h-4 w-4" />
+                              Admin
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleAssignRole(user, 'moderator')}>
+                              <Shield className="mr-2 h-4 w-4" />
+                              Moderator
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleAssignRole(user, 'auditor')}>
+                              <Shield className="mr-2 h-4 w-4" />
+                              Auditor
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   ))}

@@ -33,6 +33,8 @@ const CampaignCreate = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [brandId, setBrandId] = useState<string | null>(null);
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
+  const [isGeneratingAi, setIsGeneratingAi] = useState(false);
   
   // Initialize form with default values
   const form = useForm<CampaignFormValues>({
@@ -194,6 +196,7 @@ const CampaignCreate = () => {
   
   const saveDraft = async () => {
     try {
+      setIsSavingDraft(true);
       const values = form.getValues();
       
       // Validate form data before saving
@@ -216,6 +219,8 @@ const CampaignCreate = () => {
     } catch (error) {
       console.error('Error saving draft:', error);
       toast.error('Failed to save draft. Please try again.');
+    } finally {
+      setIsSavingDraft(false);
     }
   };
   
@@ -235,13 +240,17 @@ const CampaignCreate = () => {
     window.open(`/campaigns/preview/${previewData.id}`, '_blank');
   };
   
-  const handleAiSuggestions = () => {
-    toast.info("AI Generating Suggestions", { 
-      description: "Our AI is analyzing your inputs to suggest improvements..." 
-    });
-    
-    // Simulate AI processing
-    setTimeout(() => {
+  const handleAiSuggestions = async () => {
+    try {
+      setIsGeneratingAi(true);
+      toast.info("AI Generating Suggestions", { 
+        description: "Our AI is analyzing your inputs to suggest improvements..." 
+      });
+      
+      // Simulate AI processing
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Update form with AI suggestions
       form.setValue("title", "Summer Fashion Collection Launch 2025");
       form.setValue(
         "description", 
@@ -251,7 +260,12 @@ const CampaignCreate = () => {
       toast.success("AI Suggestions Generated", {
         description: "Check the campaign title and description for our suggestions!"
       });
-    }, 2000);
+    } catch (error) {
+      console.error('Error generating AI suggestions:', error);
+      toast.error('Failed to generate AI suggestions. Please try again.');
+    } finally {
+      setIsGeneratingAi(false);
+    }
   };
   
   // Campaign form options
@@ -345,6 +359,8 @@ const CampaignCreate = () => {
                 <CampaignDetailsSection 
                   control={form.control}
                   campaignTypes={campaignTypes}
+                  onAiSuggestions={handleAiSuggestions}
+                  isGeneratingAi={isGeneratingAi}
                 />
 
                 <TargetAudienceSection 
@@ -389,6 +405,7 @@ const CampaignCreate = () => {
 
                 <FormFooter 
                   isSubmitting={isSubmitting}
+                  isSavingDraft={isSavingDraft}
                   saveDraft={saveDraft}
                   handleSubmit={form.handleSubmit(handleFormSubmit)}
                   showPreview={handlePreview}

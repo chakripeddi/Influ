@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { 
@@ -13,6 +12,7 @@ import {
   Zap 
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/hooks/useAuth';
 import { 
   Sidebar, 
   SidebarContent, 
@@ -25,6 +25,8 @@ import {
 } from '@/components/ui/sidebar';
 
 const AdminSidebar = () => {
+  const { user } = useAuth();
+  
   const menuItems = [
     { 
       title: "Dashboard", 
@@ -88,6 +90,11 @@ const AdminSidebar = () => {
     }
   ];
 
+  // Filter menu items based on user role
+  const filteredMenuItems = menuItems.filter(item => 
+    item.role.includes(user?.role || '')
+  );
+
   return (
     <Sidebar>
       <SidebarContent>
@@ -105,7 +112,7 @@ const AdminSidebar = () => {
             <SidebarGroupLabel>Management</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {menuItems.map((item) => (
+                {filteredMenuItems.map((item) => (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton asChild>
                       <NavLink 

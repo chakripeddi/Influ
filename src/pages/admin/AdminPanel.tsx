@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Navigate, Outlet } from 'react-router-dom';
@@ -14,8 +13,7 @@ const AdminPanel = () => {
   const { user, loading } = useAuth();
   
   // Check if user has admin access - in a real app, this would validate against admin roles in the database
-  // For now, we'll just use a placeholder implementation
-  const isAdmin = user && ['admin', 'moderator', 'auditor'].includes('admin'); // Replace with actual role check
+  const isAdmin = user && ['admin', 'moderator', 'auditor'].includes(user.role);
   
   if (loading) {
     return <div className="flex items-center justify-center h-screen">Loading admin panel...</div>;
