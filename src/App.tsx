@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -33,6 +32,10 @@ import WalletPage from "./pages/wallet/WalletPage";
 import BrandHomePage from "./pages/brand/BrandHomePage";
 import BrandProfileSetupPage from "./pages/brand/BrandProfileSetupPage";
 import ProfileSetupPage from "./pages/influencer/ProfileSetupPage";
+import AboutPage from "@/pages/AboutPage";
+import BlogPage from "@/pages/BlogPage";
+import HelpCenterPage from "@/pages/HelpCenterPage";
+import ContactPage from "@/pages/ContactPage";
 
 // Admin Panel
 import AdminPanel from "./pages/admin/AdminPanel";
@@ -75,6 +78,10 @@ const App = () => (
                   <Route path="/settings/notifications" element={<NotificationSettings />} />
                   <Route path="/wallet" element={<WalletPage />} />
                   <Route path="/influencer/profile-setup" element={<ProfileSetupPage />} />
+                  <Route path="/about" element={<AboutPage />} />
+                  <Route path="/blog" element={<BlogPage />} />
+                  <Route path="/help" element={<HelpCenterPage />} />
+                  <Route path="/contact" element={<ContactPage />} />
                   
                   {/* Admin Panel Routes */}
                   <Route path="/admin" element={<AdminPanel />}>
@@ -82,7 +89,6 @@ const App = () => (
                     <Route path="users" element={<UsersManagement />} />
                     <Route path="campaigns" element={<CampaignsManagement />} />
                     <Route path="ai-alerts" element={<AIAlerts />} />
-                    {/* Additional admin routes will be added here */}
                   </Route>
                   
                   <Route path="*" element={<NotFound />} />

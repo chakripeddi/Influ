@@ -1,7 +1,6 @@
-
 import React, { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { 
   PlusCircle, 
@@ -38,6 +37,11 @@ import {
   DialogTrigger 
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { toast } from 'sonner';
+import { useWallet } from '@/hooks/useWallet';
+import { useCampaigns } from '@/hooks/useCampaigns';
+import { useInfluencers } from '@/hooks/useInfluencers';
+
 
 // Sample data
 const brandName = "FashionX";
@@ -121,12 +125,159 @@ const topInfluencers = [
 ];
 
 const BrandHomePage = () => {
+  const navigate = useNavigate();
   const [showAssistant, setShowAssistant] = useState(false);
   const [showNewCampaignModal, setShowNewCampaignModal] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   
-  const handleActionClick = (action: string) => {
-    if (action === 'create') {
-      setShowNewCampaignModal(true);
+  const { addFunds, getTransactionHistory } = useWallet();
+  const { createCampaign, updateCampaignStatus, deleteCampaign } = useCampaigns();
+  const { inviteInfluencers } = useInfluencers();
+  const [campaignLoading, setCampaignLoading] = useState<number | null>(null);
+  const [walletLoading, setWalletLoading] = useState(false);
+  const [newCampaignData, setNewCampaignData] = useState({
+    name: '',
+    budget: '',
+    startDate: '',
+    endDate: ''
+  });
+  const [isCreatingCampaign, setIsCreatingCampaign] = useState(false);
+
+  const handleActionClick = async (action: string) => {
+    setIsLoading(true);
+    try {
+      switch (action) {
+        case 'create':
+          setShowNewCampaignModal(true);
+          break;
+        case 'invite':
+          const result = await inviteInfluencers();
+          if (result.success) {
+            toast.success('Influencer invitations sent successfully');
+            navigate('/influencers');
+          } else {
+            toast.error(result.error || 'Failed to invite influencers');
+          }
+          break;
+        case 'track':
+          navigate('/analytics');
+          break;
+        case 'fund':
+          const fundResult = await addFunds();
+          if (fundResult.success) {
+            toast.success('Wallet funded successfully');
+            navigate('/wallet');
+          } else {
+            toast.error(fundResult.error || 'Failed to fund wallet');
+          }
+          break;
+      }
+    } catch (error) {
+      toast.error('An unexpected error occurred');
+      console.error('Action error:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCampaignAction = async (campaignId: number, action: string) => {
+    setCampaignLoading(campaignId);
+    try {
+      switch (action) {
+        case 'view':
+          navigate(`/campaigns/${campaignId}`);
+          break;
+        case 'edit':
+          navigate(`/campaigns/${campaignId}/edit`);
+          break;
+        case 'delete':
+          const confirmDelete = window.confirm('Are you sure you want to delete this campaign?');
+          if (confirmDelete) {
+            const result = await deleteCampaign(campaignId);
+            if (result.success) {
+              toast.success('Campaign deleted successfully');
+              // Refresh campaigns list
+              window.location.reload();
+            } else {
+              toast.error(result.error || 'Failed to delete campaign');
+            }
+          }
+          break;
+        case 'pause':
+        case 'resume':
+          const newStatus = action === 'pause' ? 'paused' : 'live';
+          const result = await updateCampaignStatus(campaignId, newStatus);
+          if (result.success) {
+            toast.success(`Campaign ${action === 'pause' ? 'paused' : 'resumed'} successfully`);
+            // Refresh campaigns list
+            window.location.reload();
+          } else {
+            toast.error(result.error || `Failed to ${action} campaign`);
+          }
+          break;
+      }
+    } catch (error) {
+      toast.error('An unexpected error occurred');
+      console.error('Campaign action error:', error);
+    } finally {
+      setCampaignLoading(null);
+    }
+  };
+
+  const handleWalletAction = async (action: string) => {
+    setWalletLoading(true);
+    try {
+      switch (action) {
+        case 'add-funds':
+          const result = await addFunds();
+          if (result.success) {
+            toast.success('Funds added successfully');
+            navigate('/wallet');
+          } else {
+            toast.error(result.error || 'Failed to add funds');
+          }
+          break;
+        case 'view-history':
+          navigate('/wallet/history');
+          break;
+      }
+    } catch (error) {
+      toast.error('An unexpected error occurred');
+      console.error('Wallet action error:', error);
+    } finally {
+      setWalletLoading(false);
+    }
+  };
+
+  const handleNewCampaignSubmit = async () => {
+    if (!newCampaignData.name || !newCampaignData.budget || !newCampaignData.startDate || !newCampaignData.endDate) {
+      toast.error('Please fill in all fields');
+      return;
+    }
+
+    setIsCreatingCampaign(true);
+    try {
+      const result = await createCampaign({
+        name: newCampaignData.name,
+        budget: parseFloat(newCampaignData.budget),
+        startDate: newCampaignData.startDate,
+        endDate: newCampaignData.endDate
+      });
+
+      if (result.success) {
+        toast.success('Campaign created successfully');
+        setShowNewCampaignModal(false);
+        setNewCampaignData({ name: '', budget: '', startDate: '', endDate: '' });
+        // Refresh campaigns list
+        window.location.reload();
+      } else {
+        toast.error(result.error || 'Failed to create campaign');
+      }
+    } catch (error) {
+      toast.error('An unexpected error occurred');
+      console.error('Create campaign error:', error);
+    } finally {
+      setIsCreatingCampaign(false);
     }
   };
 
@@ -166,6 +317,7 @@ const BrandHomePage = () => {
                   icon={card.icon}
                   color={card.color}
                   onClick={() => handleActionClick(card.action)}
+                  isLoading={isLoading}
                 />
               </motion.div>
             ))}
@@ -192,7 +344,11 @@ const BrandHomePage = () => {
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ duration: 0.3, delay: index * 0.1 }}
                 >
-                  <CampaignCard campaign={campaign} />
+                  <CampaignCard 
+                    campaign={campaign} 
+                    onAction={handleCampaignAction}
+                    isLoading={campaignLoading === campaign.id}
+                  />
                 </motion.div>
               ))}
             </div>
@@ -253,12 +409,24 @@ const BrandHomePage = () => {
                   </div>
                   
                   <div className="flex space-x-2">
-                    <Button variant="default" size="sm" className="flex-1">
-                      <DollarSign className="mr-1 h-4 w-4" /> Add Funds
+                    <Button 
+                      variant="default" 
+                      size="sm" 
+                      className="flex-1"
+                      onClick={() => handleWalletAction('add-funds')}
+                      disabled={walletLoading}
+                    >
+                      <DollarSign className="mr-1 h-4 w-4" /> 
+                      {walletLoading ? 'Processing...' : 'Add Funds'}
                     </Button>
-                    <Link to="/wallet">
-                      <Button variant="outline" size="sm">History</Button>
-                    </Link>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => handleWalletAction('view-history')}
+                      disabled={walletLoading}
+                    >
+                      History
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -417,30 +585,57 @@ const BrandHomePage = () => {
                 <label htmlFor="campaignName" className="text-sm font-medium mb-1 block">
                   Campaign Name
                 </label>
-                <Input id="campaignName" placeholder="Enter campaign name" />
+                <Input 
+                  id="campaignName" 
+                  placeholder="Enter campaign name"
+                  value={newCampaignData.name}
+                  onChange={(e) => setNewCampaignData(prev => ({ ...prev, name: e.target.value }))}
+                />
               </div>
               <div>
                 <label htmlFor="campaignBudget" className="text-sm font-medium mb-1 block">
                   Budget
                 </label>
-                <Input id="campaignBudget" type="number" placeholder="Enter budget amount" />
+                <Input 
+                  id="campaignBudget" 
+                  type="number" 
+                  placeholder="Enter budget amount"
+                  value={newCampaignData.budget}
+                  onChange={(e) => setNewCampaignData(prev => ({ ...prev, budget: e.target.value }))}
+                />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="startDate" className="text-sm font-medium mb-1 block">
                     Start Date
                   </label>
-                  <Input id="startDate" type="date" />
+                  <Input 
+                    id="startDate" 
+                    type="date"
+                    value={newCampaignData.startDate}
+                    onChange={(e) => setNewCampaignData(prev => ({ ...prev, startDate: e.target.value }))}
+                  />
                 </div>
                 <div>
                   <label htmlFor="endDate" className="text-sm font-medium mb-1 block">
                     End Date
                   </label>
-                  <Input id="endDate" type="date" />
+                  <Input 
+                    id="endDate" 
+                    type="date"
+                    value={newCampaignData.endDate}
+                    onChange={(e) => setNewCampaignData(prev => ({ ...prev, endDate: e.target.value }))}
+                  />
                 </div>
               </div>
               <div>
-                <Button className="w-full">Continue to Next Step</Button>
+                <Button 
+                  className="w-full"
+                  onClick={handleNewCampaignSubmit}
+                  disabled={isCreatingCampaign}
+                >
+                  {isCreatingCampaign ? 'Creating...' : 'Continue to Next Step'}
+                </Button>
               </div>
             </div>
           </DialogContent>

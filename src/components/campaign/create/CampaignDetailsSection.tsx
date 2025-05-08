@@ -10,6 +10,7 @@ import MediaUploader from './MediaUploader';
 import { Control } from 'react-hook-form';
 import { z } from 'zod';
 import { campaignFormSchema } from '@/pages/campaigns/schema';
+import { toast } from 'sonner';
 
 type FormValues = z.infer<typeof campaignFormSchema>;
 
@@ -26,6 +27,14 @@ const CampaignDetailsSection: React.FC<CampaignDetailsSectionProps> = ({
   onAiSuggestions,
   isGeneratingAi
 }) => {
+  const handleAiSuggestions = async () => {
+    try {
+      await onAiSuggestions();
+    } catch (error) {
+      toast.error('Failed to generate AI suggestions');
+    }
+  };
+
   return (
     <div id="campaign-details">
       <FormSection 
@@ -45,7 +54,7 @@ const CampaignDetailsSection: React.FC<CampaignDetailsSectionProps> = ({
                       type="button"
                       variant="ghost"
                       size="sm"
-                      onClick={onAiSuggestions}
+                      onClick={handleAiSuggestions}
                       disabled={isGeneratingAi}
                       className="gap-2"
                     >

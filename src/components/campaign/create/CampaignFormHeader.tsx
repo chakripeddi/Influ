@@ -1,13 +1,13 @@
-
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Save, EyeIcon, Loader2, CircleCheck } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface CampaignFormHeaderProps {
   isSubmitting: boolean;
-  saveDraft: () => void;
-  handleSubmit: () => void;
+  saveDraft: () => Promise<void>;
+  handleSubmit: () => Promise<void>;
   showPreview: () => void;
 }
 
@@ -17,6 +17,24 @@ const CampaignFormHeader: React.FC<CampaignFormHeaderProps> = ({
   handleSubmit,
   showPreview
 }) => {
+  const handleSaveDraft = async () => {
+    try {
+      await saveDraft();
+      toast.success('Draft saved successfully');
+    } catch (error) {
+      toast.error('Failed to save draft');
+    }
+  };
+
+  const handleLaunch = async () => {
+    try {
+      await handleSubmit();
+      toast.success('Campaign launched successfully');
+    } catch (error) {
+      toast.error('Failed to launch campaign');
+    }
+  };
+
   return (
     <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
       <div>
@@ -29,7 +47,8 @@ const CampaignFormHeader: React.FC<CampaignFormHeaderProps> = ({
       <div className="flex gap-2 mt-4 md:mt-0">
         <Button 
           variant="outline" 
-          onClick={saveDraft}
+          onClick={handleSaveDraft}
+          disabled={isSubmitting}
         >
           <Save className="mr-2 h-4 w-4" />
           Save Draft
@@ -40,6 +59,7 @@ const CampaignFormHeader: React.FC<CampaignFormHeaderProps> = ({
             <Button 
               variant="outline"
               onClick={showPreview}
+              disabled={isSubmitting}
             >
               <EyeIcon className="mr-2 h-4 w-4" />
               Preview
@@ -51,7 +71,7 @@ const CampaignFormHeader: React.FC<CampaignFormHeaderProps> = ({
         </Tooltip>
         
         <Button 
-          onClick={handleSubmit}
+          onClick={handleLaunch}
           disabled={isSubmitting}
         >
           {isSubmitting ? (

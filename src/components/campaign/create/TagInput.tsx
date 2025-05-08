@@ -1,9 +1,9 @@
-
 import { useState, KeyboardEvent } from 'react';
 import { X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface TagInputProps {
   value: string[];
@@ -27,11 +27,15 @@ const TagInput = ({
     if (!trimmedTag) return;
     
     if (value.includes(trimmedTag)) {
+      toast.error('Tag already exists');
       setInput('');
       return;
     }
     
-    if (value.length >= maxTags) return;
+    if (value.length >= maxTags) {
+      toast.error(`Maximum ${maxTags} tags allowed`);
+      return;
+    }
     
     onChange([...value, trimmedTag]);
     setInput('');

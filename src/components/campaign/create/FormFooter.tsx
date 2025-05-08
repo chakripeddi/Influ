@@ -1,12 +1,13 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { EyeIcon, Loader2, CircleCheck } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface FormFooterProps {
   isSubmitting: boolean;
   isSavingDraft: boolean;
-  saveDraft: () => void;
-  handleSubmit: () => void;
+  saveDraft: () => Promise<void>;
+  handleSubmit: () => Promise<void>;
   showPreview: () => void;
 }
 
@@ -17,12 +18,30 @@ const FormFooter: React.FC<FormFooterProps> = ({
   handleSubmit,
   showPreview
 }) => {
+  const handleSaveDraft = async () => {
+    try {
+      await saveDraft();
+      toast.success('Draft saved successfully');
+    } catch (error) {
+      toast.error('Failed to save draft');
+    }
+  };
+
+  const handleLaunch = async () => {
+    try {
+      await handleSubmit();
+      toast.success('Campaign launched successfully');
+    } catch (error) {
+      toast.error('Failed to launch campaign');
+    }
+  };
+
   return (
     <div className="flex justify-between items-center pt-6 border-t">
       <Button
         variant="outline"
-        onClick={saveDraft}
-        disabled={isSavingDraft}
+        onClick={handleSaveDraft}
+        disabled={isSavingDraft || isSubmitting}
       >
         {isSavingDraft ? (
           <>
@@ -38,13 +57,14 @@ const FormFooter: React.FC<FormFooterProps> = ({
         <Button
           variant="outline"
           onClick={showPreview}
+          disabled={isSubmitting || isSavingDraft}
         >
           <EyeIcon className="mr-2 h-4 w-4" />
           Preview Campaign
         </Button>
         <Button
-          onClick={handleSubmit}
-          disabled={isSubmitting}
+          onClick={handleLaunch}
+          disabled={isSubmitting || isSavingDraft}
           className="min-w-[150px]"
         >
           {isSubmitting ? (
