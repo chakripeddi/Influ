@@ -37,6 +37,12 @@ import BlogPage from "@/pages/BlogPage";
 import HelpCenterPage from "@/pages/HelpCenterPage";
 import ContactPage from "@/pages/ContactPage";
 
+// Legal Pages
+import PrivacyPolicy from "@/pages/legal/PrivacyPolicy";
+import TermsOfService from "@/pages/legal/TermsOfService";
+import CookiePolicy from "@/pages/legal/CookiePolicy";
+import GDPR from "@/pages/legal/GDPR";
+
 // Admin Panel
 import AdminPanel from "./pages/admin/AdminPanel";
 import Dashboard from "./pages/admin/Dashboard";
@@ -82,6 +88,12 @@ const App = () => (
                   <Route path="/blog" element={<BlogPage />} />
                   <Route path="/help" element={<HelpCenterPage />} />
                   <Route path="/contact" element={<ContactPage />} />
+                  
+                  {/* Legal Routes */}
+                  <Route path="/privacy" element={<PrivacyPolicy />} />
+                  <Route path="/terms" element={<TermsOfService />} />
+                  <Route path="/cookies" element={<CookiePolicy />} />
+                  <Route path="/gdpr" element={<GDPR />} />
                   
                   {/* Admin Panel Routes */}
                   <Route path="/admin" element={<AdminPanel />}>

@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Instagram, Youtube, Facebook } from 'lucide-react';
@@ -7,7 +6,7 @@ const Footer = () => {
   return (
     <footer className="bg-background border-t">
       <div className="container py-12">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-8">
           <div className="space-y-4">
             <div className="flex items-center gap-2">
               <div className="rounded-full bg-brand-purple p-1">
@@ -101,6 +100,22 @@ const Footer = () => {
                 </Link>
               </li>
               <li>
+                <Link to="/blog" className="text-muted-foreground hover:text-brand-purple">
+                  Blog
+                </Link>
+              </li>
+              <li>
+                <Link to="/help" className="text-muted-foreground hover:text-brand-purple">
+                  Help Center
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          <div>
+            <h3 className="font-medium mb-4">Legal</h3>
+            <ul className="space-y-2 text-sm">
+              <li>
                 <Link to="/privacy" className="text-muted-foreground hover:text-brand-purple">
                   Privacy Policy
                 </Link>
@@ -108,6 +123,16 @@ const Footer = () => {
               <li>
                 <Link to="/terms" className="text-muted-foreground hover:text-brand-purple">
                   Terms of Service
+                </Link>
+              </li>
+              <li>
+                <Link to="/cookies" className="text-muted-foreground hover:text-brand-purple">
+                  Cookie Policy
+                </Link>
+              </li>
+              <li>
+                <Link to="/gdpr" className="text-muted-foreground hover:text-brand-purple">
+                  GDPR
                 </Link>
               </li>
             </ul>
