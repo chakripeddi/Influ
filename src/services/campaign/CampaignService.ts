@@ -1,12 +1,22 @@
 import { supabase } from '@/integrations/supabase/client';
-import { Campaign, CampaignStatus, CampaignCreateInput, CampaignUpdateInput } from '@/types/campaign';
+import { Campaign, CampaignStatus, CampaignCreateInput, CampaignUpdateInput, CampaignCategory, CampaignPlatform } from '@/types/campaign';
 import { AppError } from '@/utils/errors';
 import { UserRole } from '@/types/user';
+import Redis from 'ioredis';
+import { Database } from '@/integrations/supabase/types';
+
+const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+
+type CampaignDetails = Database['public']['Tables']['campaign_details']['Row'];
+type BrandProfile = Database['public']['Tables']['brand_profiles']['Row'];
+type DateRange = { start: string; end: string };
 
 export class CampaignService {
   private static instance: CampaignService;
 
-  private constructor() {}
+  private constructor() {
+    // Initialize any other necessary properties
+  }
 
   public static getInstance(): CampaignService {
     if (!CampaignService.instance) {
@@ -18,135 +28,190 @@ export class CampaignService {
   /**
    * Create a new campaign
    */
-  async createCampaign(input: CampaignCreateInput, userId: string): Promise<Campaign> {
-    try {
-      // Validate input
-      this.validateCampaignInput(input);
+  async createCampaign(input: {
+    title: string;
+    description: string;
+    budget: number;
+    platforms: CampaignPlatform[];
+    campaign_type: string;
+    category: CampaignCategory;
+    brand_id: string;
+    target_audience: {
+      age_range: number[];
+      interests: string[];
+      regions: string[];
+    };
+    deadline: string;
+  }): Promise<Campaign> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new AppError('Unauthorized', 401);
 
-      // Check user permissions
-      await this.checkUserPermissions(userId, UserRole.BRAND);
+    await this.checkUserPermissions(user.id);
 
-      const { data, error } = await supabase
-        .from('campaigns')
-        .insert({
-          ...input,
-          status: CampaignStatus.DRAFT,
-          created_by: userId,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .select()
-        .single();
+    const { data, error } = await supabase
+      .from('campaign_details')
+      .insert({
+        title: input.title,
+        description: input.description,
+        budget: input.budget,
+        platforms: input.platforms,
+        type: input.campaign_type,
+        category: input.category,
+        brand_id: input.brand_id,
+        age_range: input.target_audience.age_range,
+        interests: input.target_audience.interests,
+        regions: input.target_audience.regions,
+        deadline: input.deadline,
+        status: CampaignStatus.DRAFT,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        content_types: [],
+        date_range: { start: new Date().toISOString(), end: input.deadline },
+        payment_terms: 'NET30',
+        payout_model: 'FIXED',
+        num_deliverables: 1,
+        enable_ai_matching: true,
+        enable_referral: false,
+        require_nda: false,
+        require_preapproval: false,
+        optimization_focus: 'ENGAGEMENT'
+      })
+      .select('*, brand_profiles(*)')
+      .single();
 
-      if (error) throw new AppError('Failed to create campaign', error);
-      return data;
-    } catch (error) {
-      throw this.handleError(error);
-    }
+    if (error) throw new AppError(error.message, 400);
+    return this.mapCampaignDetailsToCampaign(data);
   }
 
   /**
    * Update an existing campaign
    */
-  async updateCampaign(
-    campaignId: string,
-    input: CampaignUpdateInput,
-    userId: string
-  ): Promise<Campaign> {
-    try {
-      // Validate input
-      this.validateCampaignUpdate(input);
+  async updateCampaign(id: string, input: Partial<Campaign>): Promise<Campaign> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new AppError('Unauthorized', 401);
 
-      // Check campaign ownership and permissions
-      await this.checkCampaignAccess(campaignId, userId);
+    await this.checkCampaignAccess(id);
 
-      const { data, error } = await supabase
-        .from('campaigns')
-        .update({
-          ...input,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', campaignId)
-        .select()
-        .single();
+    const { data, error } = await supabase
+      .from('campaign_details')
+      .update({
+        title: input.title,
+        description: input.description,
+        budget: input.budget,
+        platforms: input.platforms,
+        type: input.campaign_type,
+        category: input.category,
+        status: input.status,
+        content_types: input.deliverables,
+        require_preapproval: input.urgent,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select('*, brand_profiles(*)')
+      .single();
 
-      if (error) throw new AppError('Failed to update campaign', error);
-      return data;
-    } catch (error) {
-      throw this.handleError(error);
-    }
+    if (error) throw new AppError(error.message, 400);
+    return this.mapCampaignDetailsToCampaign(data);
   }
 
   /**
    * Get campaign by ID
    */
-  async getCampaign(campaignId: string, userId: string): Promise<Campaign> {
-    try {
-      const { data, error } = await supabase
-        .from('campaigns')
-        .select('*, brand:brands(*), applications(*)')
-        .eq('id', campaignId)
-        .single();
+  async getCampaign(id: string): Promise<Campaign> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new AppError('Unauthorized', 401);
 
-      if (error) throw new AppError('Failed to fetch campaign', error);
-      if (!data) throw new AppError('Campaign not found', { statusCode: 404 });
+    const { data, error } = await supabase
+      .from('campaign_details')
+      .select('*, brand_profiles(*)')
+      .eq('id', id)
+      .single();
 
-      // Check access permissions
-      await this.checkCampaignAccess(campaignId, userId);
+    if (error) throw new AppError(error.message, 400);
+    if (!data) throw new AppError('Campaign not found', 404);
 
-      return data;
-    } catch (error) {
-      throw this.handleError(error);
-    }
+    return this.mapCampaignDetailsToCampaign(data);
   }
 
   /**
-   * List campaigns with filtering and pagination
+   * List campaigns with advanced filtering, sorting, and pagination
    */
-  async listCampaigns(
-    filters: {
-      status?: CampaignStatus;
-      brandId?: string;
-      category?: string;
-      search?: string;
-    },
-    pagination: {
-      page: number;
-      limit: number;
-    },
-    userId: string
-  ): Promise<{ data: Campaign[]; total: number }> {
-    try {
-      let query = supabase
-        .from('campaigns')
-        .select('*, brand:brands(*)', { count: 'exact' });
+  async listCampaigns(params: {
+    status?: CampaignStatus;
+    category?: CampaignCategory;
+    platform?: CampaignPlatform;
+    minBudget?: number;
+    maxBudget?: number;
+    targetAudience?: {
+      ageRange?: number[];
+      interests?: string[];
+      regions?: string[];
+    };
+    search?: string;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+    page?: number;
+    limit?: number;
+  }): Promise<{ data: Campaign[]; total: number; hasMore: boolean }> {
+    const {
+      status,
+      category,
+      platform,
+      minBudget,
+      maxBudget,
+      targetAudience,
+      search,
+      sortBy = 'created_at',
+      sortOrder = 'desc',
+      page = 1,
+      limit = 10
+    } = params;
 
-      // Apply filters
-      if (filters.status) {
-        query = query.eq('status', filters.status);
-      }
-      if (filters.brandId) {
-        query = query.eq('brand_id', filters.brandId);
-      }
-      if (filters.category) {
-        query = query.eq('category', filters.category);
-      }
-      if (filters.search) {
-        query = query.ilike('title', `%${filters.search}%`);
-      }
-
-      // Apply pagination
-      const from = (pagination.page - 1) * pagination.limit;
-      const to = from + pagination.limit - 1;
-      query = query.range(from, to);
-
-      const { data, error, count } = await query;
-
-      if (error) throw new AppError('Failed to fetch campaigns', error);
-      return { data: data || [], total: count || 0 };
-    } catch (error) {
-      throw this.handleError(error);
+    const cacheKey = `campaigns:${JSON.stringify(params)}`;
+    const cached = await redis.get(cacheKey);
+    if (cached) {
+      return JSON.parse(cached);
     }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new AppError('Unauthorized', 401);
+
+    await this.checkUserPermissions(user.id);
+
+    let query: any = supabase
+      .from('campaign_details')
+      .select('*, brand_profiles(*)', { count: 'exact' });
+
+    if (status) query = query.eq('status', status);
+    if (category) query = query.eq('category', category);
+    if (platform) query = query.contains('platforms', [platform]);
+    if (minBudget) query = query.gte('budget', minBudget);
+    if (maxBudget) query = query.lte('budget', maxBudget);
+    if (targetAudience?.ageRange) query = query.overlaps('age_range', targetAudience.ageRange);
+    if (targetAudience?.interests) query = query.overlaps('interests', targetAudience.interests);
+    if (targetAudience?.regions) query = query.overlaps('regions', targetAudience.regions);
+    if (search) {
+      query = query.or(`title.ilike.%${search}%,description.ilike.%${search}%`);
+    }
+
+    const offset = (page - 1) * limit;
+    query = query
+      .order(sortBy, { ascending: sortOrder === 'asc' })
+      .range(offset, offset + limit - 1);
+
+    const { data, error, count } = await query;
+
+    if (error) throw new AppError(error.message, 400);
+
+    const campaigns = data.map(this.mapCampaignDetailsToCampaign);
+    const result = {
+      data: campaigns,
+      total: count || 0,
+      hasMore: (offset + limit) < (count || 0)
+    };
+
+    await redis.setex(cacheKey, 300, JSON.stringify(result)); // Cache for 5 minutes
+    return result;
   }
 
   /**
@@ -159,13 +224,13 @@ export class CampaignService {
   ): Promise<Campaign> {
     try {
       // Check campaign ownership and permissions
-      await this.checkCampaignAccess(campaignId, userId);
+      await this.checkCampaignAccess(campaignId);
 
       // Validate status transition
       await this.validateStatusTransition(campaignId, status);
 
       const { data, error } = await supabase
-        .from('campaigns')
+        .from('campaign_details')
         .update({
           status,
           updated_at: new Date().toISOString(),
@@ -175,7 +240,7 @@ export class CampaignService {
         .single();
 
       if (error) throw new AppError('Failed to update campaign status', error);
-      return data;
+      return this.mapCampaignDetailsToCampaign(data);
     } catch (error) {
       throw this.handleError(error);
     }
@@ -187,10 +252,10 @@ export class CampaignService {
   async deleteCampaign(campaignId: string, userId: string): Promise<void> {
     try {
       // Check campaign ownership and permissions
-      await this.checkCampaignAccess(campaignId, userId);
+      await this.checkCampaignAccess(campaignId);
 
       const { error } = await supabase
-        .from('campaigns')
+        .from('campaign_details')
         .delete()
         .eq('id', campaignId);
 
@@ -200,44 +265,64 @@ export class CampaignService {
     }
   }
 
-  // Private helper methods
+  /**
+   * Get campaign recommendations for an influencer
+   */
+  async getRecommendations(influencerId: string): Promise<Campaign[]> {
+    const cacheKey = `campaign_recommendations:${influencerId}`;
+    const cached = await redis.get(cacheKey);
+    if (cached) {
+      return JSON.parse(cached);
+    }
 
-  private async checkUserPermissions(userId: string, requiredRole: UserRole): Promise<void> {
-    const { data: user, error } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', userId)
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new AppError('Unauthorized', 401);
+
+    await this.checkUserPermissions(user.id);
+
+    const { data: influencer } = await supabase
+      .from('influencer_profiles')
+      .select('*')
+      .eq('id', influencerId)
       .single();
 
-    if (error) throw new AppError('Failed to check user permissions', error);
-    if (!user || user.role !== requiredRole) {
-      throw new AppError('Insufficient permissions', { statusCode: 403 });
-    }
+    if (!influencer) throw new AppError('Influencer not found', 404);
+
+    const { data, error } = await supabase
+      .from('campaign_details')
+      .select('*, brand_profiles(*)')
+      .eq('status', CampaignStatus.ACTIVE)
+      .overlaps('interests', influencer.categories || [])
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    if (error) throw new AppError(error.message, 400);
+
+    const campaigns = data.map(this.mapCampaignDetailsToCampaign);
+    await redis.setex(cacheKey, 3600, JSON.stringify(campaigns)); // Cache for 1 hour
+    return campaigns;
   }
 
-  private async checkCampaignAccess(campaignId: string, userId: string): Promise<void> {
+  // Private helper methods
+
+  private async checkUserPermissions(userId: string): Promise<void> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new AppError('Unauthorized', 401);
+  }
+
+  private async checkCampaignAccess(campaignId: string): Promise<void> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new AppError('Unauthorized', 401);
+
     const { data: campaign, error } = await supabase
-      .from('campaigns')
-      .select('created_by, brand_id')
+      .from('campaign_details')
+      .select('brand_id')
       .eq('id', campaignId)
       .single();
 
-    if (error) throw new AppError('Failed to check campaign access', error);
-    if (!campaign) throw new AppError('Campaign not found', { statusCode: 404 });
-
-    // Check if user is the creator or has admin role
-    const { data: user } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', userId)
-      .single();
-
-    if (!user) throw new AppError('User not found', { statusCode: 404 });
-
-    if (user.role === UserRole.ADMIN) return;
-    if (campaign.created_by === userId) return;
-
-    throw new AppError('Insufficient permissions', { statusCode: 403 });
+    if (error || !campaign) {
+      throw new AppError('Campaign not found', 404);
+    }
   }
 
   private async validateStatusTransition(
@@ -245,7 +330,7 @@ export class CampaignService {
     newStatus: CampaignStatus
   ): Promise<void> {
     const { data: campaign } = await supabase
-      .from('campaigns')
+      .from('campaign_details')
       .select('status')
       .eq('id', campaignId)
       .single();
@@ -285,7 +370,36 @@ export class CampaignService {
   }
 
   private handleError(error: any): Error {
-    if (error instanceof AppError) return error;
-    return new AppError('An unexpected error occurred', error);
+    console.error('CampaignService Error:', error);
+    return new AppError(
+      error.message || 'An error occurred in the campaign service',
+      error.status || 500
+    );
+  }
+
+  private mapCampaignDetailsToCampaign(details: CampaignDetails & { brand_profiles?: BrandProfile | null }): Campaign {
+    const brand = details.brand_profiles || {};
+    const dateRange = details.date_range as DateRange;
+    return {
+      id: details.id,
+      title: details.title,
+      description: details.description,
+      detailed_description: details.description,
+      budget: details.budget,
+      platforms: details.platforms.map(p => p as CampaignPlatform),
+      campaign_type: details.type,
+      category: CampaignCategory.OTHER, // Default to OTHER if not matching
+      status: details.status as CampaignStatus,
+      deadline: dateRange?.end || new Date(details.created_at || '').toISOString(),
+      deliverables: details.content_types || [],
+      brand: (brand as BrandProfile)?.business_name || '',
+      brand_logo: (brand as BrandProfile)?.logo_url || undefined,
+      created_at: details.created_at || undefined,
+      updated_at: details.updated_at || undefined,
+      requirements: details.interests || [],
+      urgent: details.require_preapproval || false,
+      created_by: details.brand_id,
+      brand_id: details.brand_id
+    };
   }
 } 

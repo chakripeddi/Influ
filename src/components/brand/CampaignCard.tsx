@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Eye, Heart, MousePointer, Calendar, ArrowRight } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -24,6 +23,8 @@ interface Campaign {
 
 interface CampaignCardProps {
   campaign: Campaign;
+  onAction: (campaignId: number, action: string) => Promise<void>;
+  isLoading?: boolean;
 }
 
 const formatDate = (dateString: string) => {
@@ -45,7 +46,7 @@ const statusLabels = {
   completed: 'Completed',
 };
 
-const CampaignCard: React.FC<CampaignCardProps> = ({ campaign }) => {
+const CampaignCard: React.FC<CampaignCardProps> = ({ campaign, onAction, isLoading }) => {
   const progressPercentage = campaign.spent > 0 
     ? Math.min(Math.round((campaign.spent / campaign.budget) * 100), 100) 
     : 0;

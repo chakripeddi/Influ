@@ -1,7 +1,6 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { Database } from '@/integrations/supabase/types';
+import { api } from '@/lib/api';
+import { useAuth } from '@/hooks/useAuth';
 
 interface UserReferral {
   user_id: string;
@@ -54,35 +53,23 @@ export const ReferralProvider = ({ children }: { children: ReactNode }) => {
   const [userRole, setUserRole] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const { user } = useAuth();
 
   useEffect(() => {
     const fetchReferralData = async () => {
       try {
         setLoading(true);
-        // Check if user is authenticated
-        const { data: { user } } = await supabase.auth.getUser();
-
         if (!user) {
           setLoading(false);
           return;
         }
 
-        // Get user role from metadata
-        const userRole = user.user_metadata?.user_role || null;
-        setUserRole(userRole);
+        // Get user role from user object
+        setUserRole(user.role);
 
-        // Get referral data from database
-        const { data: referralData, error: referralError } = await supabase
-          .from('user_referrals')
-          .select('referral_code, referrals_count, points_earned, role, brand_referrals_count, influencer_referrals_count, brand_referral_code, influencer_referral_code')
-          .eq('user_id', user.id)
-          .maybeSingle();
-
-        if (referralError) {
-          if (referralError.code !== 'PGRST116') { // PGRST116 is "no rows returned"
-            throw referralError;
-          }
-        }
+        // Get referral data from API
+        const response = await api.get('/referrals/me');
+        const referralData = response.data;
 
         if (!referralData) {
           // Generate new referral codes for user
@@ -91,7 +78,7 @@ export const ReferralProvider = ({ children }: { children: ReactNode }) => {
           let influencerCode = null;
 
           // For campaigners, generate separate codes for brands and influencers
-          if (userRole === 'campaigner') {
+          if (user.role === 'campaigner') {
             brandCode = generateUniqueCode(user.id + '-brand');
             influencerCode = generateUniqueCode(user.id + '-influencer');
             setBrandReferralCode(brandCode);
@@ -100,21 +87,17 @@ export const ReferralProvider = ({ children }: { children: ReactNode }) => {
 
           setReferralCode(newReferralCode);
 
-          // Store in database - Fix: Convert Date to ISO string
-          await supabase
-            .from('user_referrals')
-            .insert({
-              user_id: user.id,
-              referral_code: newReferralCode,
-              brand_referral_code: brandCode,
-              influencer_referral_code: influencerCode,
-              referrals_count: 0,
-              brand_referrals_count: 0,
-              influencer_referrals_count: 0,
-              points_earned: 0,
-              role: userRole,
-              created_at: new Date().toISOString()
-            });
+          // Store in database
+          await api.post('/referrals', {
+            referral_code: newReferralCode,
+            brand_referral_code: brandCode,
+            influencer_referral_code: influencerCode,
+            referrals_count: 0,
+            brand_referrals_count: 0,
+            influencer_referrals_count: 0,
+            points_earned: 0,
+            role: user.role
+          });
         } else {
           // Use existing referral data
           setReferralCode(referralData.referral_code);
@@ -135,7 +118,7 @@ export const ReferralProvider = ({ children }: { children: ReactNode }) => {
     };
 
     fetchReferralData();
-  }, []);
+  }, [user]);
 
   // Generate a unique referral code based on user ID
   const generateUniqueCode = (userId: string): string => {
@@ -202,15 +185,19 @@ export const ReferralProvider = ({ children }: { children: ReactNode }) => {
     copyReferralLink,
     shareViaEmail,
     shareViaWhatsApp,
-    shareViaInstagram,
+    shareViaInstagram
   };
 
-  return <ReferralContext.Provider value={value}>{children}</ReferralContext.Provider>;
+  return (
+    <ReferralContext.Provider value={value}>
+      {children}
+    </ReferralContext.Provider>
+  );
 };
 
 export const useReferral = () => {
   const context = useContext(ReferralContext);
-  if (context === undefined) {
+  if (!context) {
     throw new Error('useReferral must be used within a ReferralProvider');
   }
   return context;

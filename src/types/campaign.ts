@@ -32,19 +32,20 @@ export interface Campaign {
   description: string;
   detailed_description?: string;
   budget: number;
-  rate_per_post?: number;
   platforms: CampaignPlatform[];
   campaign_type: string;
   category: CampaignCategory;
   status: CampaignStatus;
-  deadline?: string;
+  deadline: string;
+  deliverables: string[];
+  brand: string;
+  brand_logo?: string;
+  created_at?: string;
+  updated_at?: string;
+  requirements?: string[];
   urgent: boolean;
   created_by: string;
   brand_id: string;
-  created_at: string;
-  updated_at: string;
-  brand?: Brand;
-  applications?: CampaignApplication[];
 }
 
 export interface Brand {
@@ -97,11 +98,14 @@ export interface CampaignCreateInput {
   description: string;
   detailed_description?: string;
   budget: number;
-  rate_per_post?: number;
   platforms: CampaignPlatform[];
   campaign_type: string;
   category: CampaignCategory;
-  deadline?: string;
+  deadline: string;
+  deliverables: string[];
+  brand: string;
+  brand_logo?: string;
+  requirements?: string[];
   urgent?: boolean;
   brand_id: string;
 }
@@ -111,11 +115,14 @@ export interface CampaignUpdateInput {
   description?: string;
   detailed_description?: string;
   budget?: number;
-  rate_per_post?: number;
   platforms?: CampaignPlatform[];
   campaign_type?: string;
   category?: CampaignCategory;
   deadline?: string;
+  deliverables?: string[];
+  brand?: string;
+  brand_logo?: string;
+  requirements?: string[];
   urgent?: boolean;
   status?: CampaignStatus;
 }
